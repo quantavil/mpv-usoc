@@ -1,6 +1,6 @@
 # uosc Auto-Installer for MPV
 
-Automatically installs and configures [uosc](https://github.com/tomasklaen/uosc) - a modern UI for MPV media player on Fedora-based systems.
+Automatically installs and configures [uosc](https://github.com/tomasklaen/uosc) - a modern UI for MPV media player on Linux-based systems.
 
 ## Features
 
