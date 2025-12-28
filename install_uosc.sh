@@ -1,131 +1,111 @@
 #!/bin/bash
 set -e  # Exit immediately if any command fails
 
-# --- Variables ---
+# --- Configuration ---
 MPV_DIR="$HOME/.config/mpv"
-TEMP_DIR="uosc_temp"
-UOSC_OPTS_DIR="$MPV_DIR/script-opts"
-GITHUB_REPO="tomasklaen/uosc"
+SCRIPTS_DIR="$MPV_DIR/scripts"
+OPTS_DIR="$MPV_DIR/script-opts"
+FONTS_DIR="$MPV_DIR/fonts"
+TEMP_DIR="mpv_install_temp"
+
+# Repositories
+UOSC_REPO="tomasklaen/uosc"
+THUMBFAST_RAW="https://raw.githubusercontent.com/po5/thumbfast/master"
+
+# Files
 MPV_CONF="$MPV_DIR/mpv.conf"
 INPUT_CONF="$MPV_DIR/input.conf"
 
+# --- Helper Functions ---
+log() { echo -e "\033[1;34m[INFO]\033[0m $1"; }
+err() { echo -e "\033[1;31m[ERROR]\033[0m $1"; exit 1; }
+
+download_file() {
+    local url="$1"
+    local dest="$2"
+
+    log "Downloading $(basename "$dest")..."
+    # -o overwrites by default
+    if ! curl -s -L "$url" -o "$dest"; then
+        err "Failed to download $url"
+    fi
+}
+
 # --- 1. Dependency Check ---
-echo "Checking dependencies..."
+log "Checking dependencies..."
 if ! command -v mpv &> /dev/null || ! command -v jq &> /dev/null; then
-    echo "Missing dependencies. Installing mpv and jq..."
+    log "Missing dependencies. Installing mpv and jq..."
     sudo dnf install -y mpv jq
-else
-    echo "Dependencies (mpv, jq) are present."
 fi
 
 # --- 2. Directory Setup ---
-echo "Preparing directories..."
-rm -rf "$TEMP_DIR" # Clean start
-mkdir -p "$TEMP_DIR"
-mkdir -p "$MPV_DIR/scripts"
-mkdir -p "$UOSC_OPTS_DIR"
-mkdir -p "$MPV_DIR/fonts"
+log "Preparing directories..."
+rm -rf "$TEMP_DIR"
+mkdir -p "$TEMP_DIR" "$SCRIPTS_DIR" "$OPTS_DIR" "$FONTS_DIR"
 
-# --- 3. Download Latest Release ---
-echo "Fetching latest release URL..."
-DOWNLOAD_URL=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | jq -r '.assets[] | select(.name | endswith(".zip")) | .browser_download_url')
+# --- 3. Install uosc (Release Zip) ---
+log "Fetching latest uosc release..."
+UOSC_URL=$(curl -s "https://api.github.com/repos/$UOSC_REPO/releases/latest" | jq -r '.assets[] | select(.name | endswith(".zip")) | .browser_download_url')
 
-if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" == "null" ]; then
-    echo "Error: Could not find download URL."
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
+[ -z "$UOSC_URL" ] || [ "$UOSC_URL" == "null" ] && err "Could not find uosc download URL."
 
-echo "Downloading uosc package..."
-curl -L -o "$TEMP_DIR/uosc.zip" "$DOWNLOAD_URL"
+download_file "$UOSC_URL" "$TEMP_DIR/uosc.zip"
 
-# --- 4. Smart Extraction & Installation ---
-echo "Extracting..."
-unzip -o "$TEMP_DIR/uosc.zip" -d "$TEMP_DIR/extracted" > /dev/null
+log "Extracting and installing uosc..."
+unzip -q -o "$TEMP_DIR/uosc.zip" -d "$TEMP_DIR/extracted"
+SOURCE_ROOT=$(find "$TEMP_DIR/extracted" -name "scripts" -type d | head -n 1 | xargs dirname)
 
-# Dynamic Path Detection
-FOUND_SCRIPTS=$(find "$TEMP_DIR/extracted" -name "scripts" -type d | head -n 1)
+[ -z "$SOURCE_ROOT" ] && err "Could not find extracted uosc files."
 
-if [ -z "$FOUND_SCRIPTS" ]; then
-    echo "Error: 'scripts' folder not found in the downloaded zip."
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
+cp -r "$SOURCE_ROOT/scripts/"* "$SCRIPTS_DIR/"
+[ -d "$SOURCE_ROOT/fonts" ] && cp -r "$SOURCE_ROOT/fonts/"* "$FONTS_DIR/"
 
-SOURCE_ROOT=$(dirname "$FOUND_SCRIPTS")
-echo "Found source files in: $SOURCE_ROOT"
+# Install uosc config (Direct Overwrite)
+download_file "https://raw.githubusercontent.com/$UOSC_REPO/master/src/uosc.conf" "$OPTS_DIR/uosc.conf"
 
-# Install Scripts
-echo "Installing scripts..."
-cp -r "$SOURCE_ROOT/scripts/"* "$MPV_DIR/scripts/"
+# --- 4. Install thumbfast (Direct Lua Download) ---
+log "Installing thumbfast..."
+mkdir -p "$SCRIPTS_DIR/thumbfast"
 
-# Install Fonts (Safety Check)
-if [ -d "$SOURCE_ROOT/fonts" ]; then
-    echo "Installing fonts..."
-    cp -r "$SOURCE_ROOT/fonts/"* "$MPV_DIR/fonts/"
-else
-    echo "Warning: fonts directory not found in source, skipping font installation."
-fi
+# Download lua to dedicated folder as main.lua
+download_file "$THUMBFAST_RAW/thumbfast.lua" "$SCRIPTS_DIR/thumbfast/main.lua"
 
-# Post-Install Verification (UPDATED FOR v5+)
-if [ -f "$MPV_DIR/scripts/uosc/main.lua" ]; then
-    echo "Verified: uosc (package mode) installed successfully."
-elif [ -f "$MPV_DIR/scripts/uosc.lua" ]; then
-    echo "Verified: uosc (legacy mode) installed successfully."
-else
-    echo "Error: uosc installation failed. Could not find 'scripts/uosc/main.lua'."
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
+# Install thumbfast config (Direct Overwrite)
+download_file "$THUMBFAST_RAW/thumbfast.conf" "$OPTS_DIR/thumbfast.conf"
 
-# --- 5. Download & Install Config ---
-echo "Downloading default uosc.conf..."
-curl -s -L "https://raw.githubusercontent.com/tomasklaen/uosc/master/src/uosc.conf" -o "$UOSC_OPTS_DIR/uosc.conf"
-
-# --- 6. Configure mpv.conf (Idempotent) ---
-echo "Configuring mpv.conf..."
+# --- 5. Configure mpv.conf (Append Only) ---
 if [ ! -f "$MPV_CONF" ]; then touch "$MPV_CONF"; fi
 
 if ! grep -q "# --- uosc setup ---" "$MPV_CONF"; then
+    log "Appending uosc settings to mpv.conf..."
     cat <<EOF >> "$MPV_CONF"
 
 # --- uosc setup ---
-# Disable default UI for uosc
 osc=no
 osd-bar=no
 border=no
-
-# Persistence settings
 save-position-on-quit=yes
 watch-later-options=start,speed,volume
 EOF
-    echo "Added uosc settings to mpv.conf."
 else
-    echo "uosc settings already detected in mpv.conf. Skipping."
+    log "uosc settings already present in mpv.conf."
 fi
 
-# --- 7. Configure input.conf (Idempotent) ---
-echo "Configuring input.conf..."
+# --- 6. Configure input.conf (Append Only) ---
 if [ ! -f "$INPUT_CONF" ]; then touch "$INPUT_CONF"; fi
 
 if ! grep -q "# --- uosc specific bindings ---" "$INPUT_CONF"; then
+    log "Appending bindings to input.conf..."
     cat <<EOF >> "$INPUT_CONF"
 
 # --- uosc specific bindings ---
-# Opens unified menu for Playlist and File Browser
 p script-binding uosc/items
-
-# --- Video Filters ---
-# Toggle Invert Colors (Negate)
 i vf toggle negate
 EOF
-    echo "Added keybindings to input.conf."
 else
-    echo "Keybindings already detected in input.conf. Skipping."
+    log "Bindings already present in input.conf."
 fi
 
-# --- 8. Cleanup ---
-echo "Cleaning up temporary files..."
+# --- 7. Cleanup ---
 rm -rf "$TEMP_DIR"
-
-echo "Success! uosc has been installed and configured."
+log "Installation complete! Restart mpv to apply changes."
