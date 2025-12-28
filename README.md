@@ -1,80 +1,91 @@
-# uosc Auto-Installer for MPV
+# uosc & thumbfast Auto-Installer for MPV
 
-Automatically installs and configures [uosc](https://github.com/tomasklaen/uosc) - a modern UI for MPV media player on Linux-based systems.
+Automatically installs and configures [uosc](https://github.com/tomasklaen/uosc) (Minimalist UI) and [thumbfast](https://github.com/po5/thumbfast) (High-performance thumbnails) for MPV on Linux.
 
 ## Features
 
-- ✅ Auto-installs dependencies (mpv, jq)
-- ✅ Downloads latest uosc release
-- ✅ Smart extraction with verification
-- ✅ Idempotent - safe to re-run
-- ✅ Configures MPV with optimal settings
+* ✅ **Auto-installs dependencies** (`mpv`, `jq`)
+* ✅ **Installs `uosc`** (Latest Release)
+* ✅ **Installs `thumbfast`** (Latest Master)
+* ✅ **Auto-Configures** `mpv.conf` and `input.conf` with optimal settings
+* ✅ **Destructive Updates:** Overwrites script configs with the latest defaults to ensure compatibility
 
 ## Quick Start
 
 ```bash
-curl -O https://raw.githubusercontent.com/quantavil/mpv-usoc/main/install-uosc.sh
+curl -O [https://raw.githubusercontent.com/quantavil/mpv-usoc/main/install-uosc.sh](https://raw.githubusercontent.com/quantavil/mpv-usoc/main/install-uosc.sh)
 chmod +x install-uosc.sh
 ./install-uosc.sh
+
 ```
 
 ## What It Does
 
-1. Installs MPV and jq if missing
-2. Downloads latest uosc from GitHub
-3. Installs scripts, fonts, and config to `~/.config/mpv/`
-4. Configures MPV settings (disables default OSC)
-5. Adds useful keybindings:
-   - `p` - Open uosc menu
-   - `i` - Toggle color inversion
+1. **Dependencies:** Installs `mpv` and `jq` (via `dnf`) if missing.
+2. **uosc:** Downloads the latest release, installs scripts/fonts, and overwrites `uosc.conf`.
+3. **thumbfast:** Downloads the latest Lua script and config, installing them to `~/.config/mpv/scripts/thumbfast`.
+4. **Config:**
+* Appends required settings to `mpv.conf` (e.g., disables default OSC).
+* Appends useful keybindings to `input.conf`.
+
+
+
+## Keybindings Added
+
+* `p` — Open uosc menu / playlist
+* `i` — Toggle color inversion (Video Filter)
 
 ## Update
 
-Just run the script again:
+To update **uosc** or **thumbfast**, simply run the script again.
+
+> **⚠️ Warning:** This script overwrites `script-opts/uosc.conf` and `script-opts/thumbfast.conf` with the default versions from GitHub. **Any manual customizations to these two specific files will be lost.**
+
 ```bash
 ./install-uosc.sh
+
 ```
 
 ## Uninstall
 
-**Remove uosc only:**
+**Remove scripts only:**
+
 ```bash
-rm ~/.config/mpv/scripts/uosc.lua
+rm -rf ~/.config/mpv/scripts/uosc
+rm -rf ~/.config/mpv/scripts/thumbfast
 rm -rf ~/.config/mpv/fonts/uosc*
 rm ~/.config/mpv/script-opts/uosc.conf
+rm ~/.config/mpv/script-opts/thumbfast.conf
+
 ```
 
 **Remove MPV completely:**
+
 ```bash
 sudo dnf remove mpv
 rm -rf ~/.config/mpv ~/.cache/mpv ~/.local/state/mpv ~/.local/share/mpv
+
 ```
 
 ## Troubleshooting
 
-- **UI doesn't appear:** Check `~/.config/mpv/mpv.conf` has `osc=no`
-- **Script fails:** Verify internet connection and GitHub access
-- **Non-Fedora systems:** Replace `dnf` with your package manager
+* **Thumbnails not showing:** Ensure `mpv` is compiled with support for the video format you are playing.
+* **UI overlaps:** Check `~/.config/mpv/mpv.conf` to ensure `osc=no` is present.
+* **Non-Fedora systems:** The script uses `dnf`. For Debian/Arch, manually install `mpv` and `jq` before running, or modify the script.
 
 ## Customization
 
-Edit uosc settings:
-```bash
-~/.config/mpv/script-opts/uosc.conf
-```
+After installation, you can customize settings here (note that running the installer again will reset these):
 
-See [uosc documentation](https://github.com/tomasklaen/uosc#options) for options.
-
-## Links
-
-- [uosc Repository](https://github.com/tomasklaen/uosc)
-- [MPV Documentation](https://mpv.io/manual/stable/)
+* **uosc:** `~/.config/mpv/script-opts/uosc.conf`
+* **thumbfast:** `~/.config/mpv/script-opts/thumbfast.conf`
 
 ## Credits
 
-- [uosc](https://github.com/tomasklaen/uosc) by tomasklaen
-- [MPV Media Player](https://mpv.io/)
+* [uosc](https://github.com/tomasklaen/uosc) by tomasklaen
+* [thumbfast](https://github.com/po5/thumbfast) by po5
+* [MPV Media Player](https://mpv.io/)
 
 ---
 
-**License:** MIT | **Note:** Unofficial installer for Linux-based systems
+**License:** MIT | **Note:** Unofficial installer for Linux 
